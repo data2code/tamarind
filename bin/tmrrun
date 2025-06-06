@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+import argparse, subprocess
+import sys, pkgutil, os
+import tamarind.model  # Ensure this is importable
+
+def discover_commands():
+    package = tamarind.model
+    return sorted(
+        name for _, name, is_pkg in pkgutil.iter_modules(package.__path__) if not is_pkg
+    )
+
+def list_commands():
+    print("Supported models:")
+    for cmd in discover_commands():
+        print(f"  {cmd}")
+
+def run_command(command, args):
+    if command not in discover_commands():
+        print(f"Error: '{command}' is not a supported model.\n")
+        list_commands()
+        sys.exit(1)
+
+    # Construct full path to the script
+    module_path = os.path.join(os.path.dirname(tamarind.model.__file__), f"{command}.py")
+    if not os.path.isfile(module_path):
+        print(f"Error: Script file for model '{command}' not found at {module_path}")
+        sys.exit(1)
+
+    cmd = [sys.executable, module_path] + args
+
+    try:
+        subprocess.run(cmd, check=True)
+    except FileNotFoundError:
+        print(f"Error: Model '{command}' not found in PATH.")
+    except subprocess.CalledProcessError as e:
+        print(f"Model failed with exit code {e.returncode}")
+
+def main():
+    known_commands = discover_commands()
+
+    # If no arguments, show help
+    if len(sys.argv) == 1:
+        print("Usage: tmrrun [list | <model> [args...]]")
+        sys.exit(0)
+
+    first_arg = sys.argv[1]
+
+    if first_arg == "list":
+        list_commands()
+    elif first_arg in known_commands:
+        run_command(first_arg, sys.argv[2:])
+    else:
+        print(f"Unknown model or usage: {' '.join(sys.argv[1:])}")
+        print("Use `tmrrun list` to see available models.")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+from tamarind.tamarind import JobManagement, Model
+import pandas as pd
+import argparse as arg
+
+if __name__=="__main__":
+    opt=arg.ArgumentParser(description='Monitor Jobs in Tamarind')
+    opt.add_argument('-t','--job_type', type=str, default=None, help='job_type, e.g., alphafold. If None, monitor all jobs.')
+    opt.add_argument('-l','--list', default=False, action='store_true', help='List job names without monitoring')
+    opt.add_argument('-o','--output', default=None, help='Used with -l. .csv file name')
+    opt.add_argument('-e','--expand_batch', default=False, action='store_true', help='Used with -l. Show jobs under each batch.')
+    opt.add_argument('name', type=str, default=None, nargs="?", help='job/batch name to monitor, if not specify, will monitor everything.')
+    args=opt.parse_args()
+    jm = JobManagement()
+
+    if args.list:
+        jobs=jm.get_jobs(expand_batch=args.expand_batch, job_type=args.job_type)
+        if args.output is not None:
+            jobs.to_csv(args.output, index=False)
+        if args.expand_batch:
+            jobs['Name']=jobs.apply(lambda r: r['Batch']+"/"+r['JobName'] if pd.notnull(r['Batch']) else r['JobName'], axis=1)
+        else:
+            jobs['Name']=jobs.apply(lambda r: r['JobName']+"/*" if (r['Type']=='batch') else r['JobName'], axis=1)
+        for k,t_v in jobs.groupby('JobStatus'):
+            print("Status: "+k)
+            print("\n".join(sorted(t_v.Name)))
+            print()
+    elif args.name is None:
+        jm.monitor_all(args.job_type, expand_batch=True, skip_download=True)
+    else:
+        jobs=jm.get_jobs(job_name=args.name)
+        if len(jobs)==0:
+            print(f"Job: {args.name} is not found, use -l to list all jobs.")
+            exit()
+        if jobs.Type.tolist()[0]=='batch':
+            jm.monitor_batch(args.name, skip_download=True)
+        else:
+            jm.monitor(args.name, skip_download=True)

@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+from tamarind.tamarind import JobManagement, Model
+import argparse as arg
+import os,importlib,traceback
+
+if __name__=="__main__":
+    opt=arg.ArgumentParser(description='Download Results for jobs/batches')
+    opt.add_argument('-o','--output_folder', type=str, default=".", help='Parent folder to host result data')
+    opt.add_argument('--all', action='store_true', help='Download results for ALL jobs and batches')
+    opt.add_argument('name', type=str, default=None, nargs="*", help='List of job/batch names')
+    args=opt.parse_args()
+    jm = JobManagement()
+    jobs=jm.get_jobs(expand_batch=False)
+    jobs['Batch'].fillna('', inplace=True)
+
+    if not args.all:
+        if len(args.name)==0:
+            print("Missing job/batch name, use --all to download all jobs/batches.")
+            exit()
+        else:
+            jobs=jobs[jobs.JobName.isin(args.name)]
+
+    for i,r in jobs.iterrows():
+        print(f"Download results for {r['JobName']} ...")
+        if r['Type']=='batch':
+            jm.get_batch_results(r['JobName'], output_folder=args.output_folder)
+        else:
+            jm.get_results(r['JobName'], output_folder=args.output_folder)
+
+    # create result.csv if module exists
+    for (batch, model),t_v in jobs.groupby(['Batch','Model']):
+        if batch=="":
+            # we summarize results within each batch, do not merge the non-batch jobs
+            continue
+        try:
+            module = importlib.import_module(f"tamarind.model.{model}")
+            App = getattr(module, "App")
+            f = getattr(App, "results", None)
+            if f is not None and callable(f):
+                print(f"Generate results for batch {batch} using {model}")
+                fd=os.path.join(args.output_folder, batch)
+                if os.path.exists(fd):
+                    App.results(fd)
+            else:
+                print(f"Ignore model {model}, as no results() method was found.")
+        except Exception as e:
+            print(traceback.format_exc())
+
