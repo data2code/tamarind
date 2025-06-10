@@ -11,7 +11,8 @@ class App(Model): # Do not rename the class
 
     #// Set the default parameters from the corresponding online API document
     default_opt={"inputFormat": "sequence", "addLigands": False, "numSamples": 5, "numBatches": 1,
-            "numRecycles": 3, "stepScale": 1.638, "seed":0, "pocketRestraints":"", "outputType":"pdb"}
+            "numRecycles": 3, "predictAffinity": False, "binderChain": "A", "stepScale": 1.638,
+            "seed":0, "bonds": "", "pocketRestraints":"", "outputType":"pdb", "version": "2.0.3"}
 
     def run(self, name, seq, output_folder=".", options=None, wait=True):
         """Set name to your protein name. name should be unique to your account.

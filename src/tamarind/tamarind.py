@@ -436,9 +436,7 @@ class Model:
 
 if __name__=="__main__":
     # Example usage:
-    api_key = "01332417-aed5-4ff6-b479-880a47cbaebb"
-    base_url = "https://app.tamarind.bio/api/"
-    jm = JobManagement(api_key, base_url)
+    jm = JobManagement()
     #jm.upload_file("1crn.cif", "111.cif", folder="my")
     #jm.get_jobs(job_type="alphafold").display()
     #print(jm.get_all_files())
