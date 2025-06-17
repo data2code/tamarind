@@ -10,9 +10,12 @@ class App(Model): # Do not rename the class
         super().__init__('boltz')
 
     #// Set the default parameters from the corresponding online API document
+    # versions are 2.1.1, 1.0.0, 0.4.0
     default_opt={"inputFormat": "sequence", "addLigands": False, "numSamples": 5, "numBatches": 1,
             "numRecycles": 3, "predictAffinity": False, "binderChain": "A", "stepScale": 1.638,
-            "seed":0, "bonds": "", "pocketRestraints":"", "outputType":"pdb", "version": "2.0.3"}
+            "seed":0, "bonds": "", "pocketRestraints":"", "outputType":"pdb", "version": "2.1.1",
+            "templateFiles": [], "templateMapping": []
+            }
 
     def run(self, name, seq, output_folder=".", options=None, wait=True):
         """Set name to your protein name. name should be unique to your account.
