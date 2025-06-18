@@ -3,7 +3,7 @@ import glob
 
 setup(
     name='tamarind',
-    version='0.1.0',
+    version='0.1.1',
     description='A Python wrapper for the Tamarind.bio API',
     url='https://github.com/data2code/tamarind',
     author='Yingyao Zhou',

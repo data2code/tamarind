@@ -1,12 +1,15 @@
 #!/usr/bin/env python
+import tamarind.tamarind as tmr
 from tamarind.tamarind import JobManagement, Model
 import argparse as arg
 
 if __name__=="__main__":
     opt=arg.ArgumentParser(description='Delete a Job/Batch from Tamarind')
     opt.add_argument('--all', action='store_true', help='Delete ALL jobs and batches')
+    opt.add_argument('--debug', action='store_true', help='Print API message')
     opt.add_argument('name', type=str, default=None, nargs="*", help='List of job/batch names')
     args=opt.parse_args()
+    if args.debug: tmr.DEBUG = True
     jm = JobManagement()
     if args.all:
         jobs=jm.get_jobs()
@@ -18,7 +21,9 @@ if __name__=="__main__":
 
     for job_name in args.name:
         jobs=jm.get_jobs(job_name=job_name, expand_batch=False)
-        if len(jobs)==0: continue
+        if len(jobs)==0:
+            print(f"Job is not found: {job_name}, ignored.")
+            continue
         r=dict(jobs.iloc[0])
         if r['Type']=='batch':
             jobs=jm.delete_batch(r['JobName'])

@@ -1,12 +1,15 @@
 #!/usr/bin/env python
+import tamarind.tamarind as tmr
 from tamarind.tamarind import JobManagement, Model
 import argparse as arg
 
 if __name__=="__main__":
     opt=arg.ArgumentParser(description='Delete a file/folder from Tamarind')
     opt.add_argument('--all', action='store_true', help='Delete ALL files and folders from Tamarind')
+    opt.add_argument('--debug', action='store_true', help='Print message from API')
     opt.add_argument('name', type=str, default=None, nargs="*", help='List of files/folders, folder names must end with "/".')
     args=opt.parse_args()
+    if args.debug: tmr.DEBUG = True
     jm = JobManagement()
     if args.all:
         jobs=jm.get_jobs(expand_batch=False)

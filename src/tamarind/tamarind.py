@@ -6,6 +6,7 @@ import os,random,string,time,json,tqdm,zipfile,re
 proxies = {k:os.environ.get(k+"_proxy") for k in ("http","https") if os.environ.get(k+"_proxy", "")!=""}
 # interval (seconds) when pulling job status
 MONITOR_INTERVAL=10
+DEBUG=False
 
 class JobManagement:
 
@@ -119,8 +120,10 @@ class JobManagement:
         while True:
             response = requests.get(self.base_url + endpoint, headers=self.headers, params=params)
             if response.status_code!=200:
+                if DEBUG: print(response.text)
                 break
             jobs_json=response.json()
+            if DEBUG: print(jobs_json)
 
             if 'jobs' in jobs_json:
                 out.extend(jobs_json['jobs'])
@@ -154,8 +157,10 @@ class JobManagement:
             response = requests.get(self.base_url + endpoint, headers=self.headers, params=params)
             if response.status_code != 200:
                 print(f"Warning: no job found under batch {batch_name}")
+                if DEBUG: print(response.text)
                 break
             jobs_json=response.json()
+            if DEBUG: print(jobs_json)
             if 'jobs' in jobs_json:
                 out.extend(jobs_json['jobs'])
             elif '0' in jobs_json:
@@ -175,6 +180,7 @@ class JobManagement:
         params = {"jobName": job_name}
         response = requests.post(self.base_url + endpoint, headers=self.headers, json=params)
         print(f"Job deleted: {job_name}")
+        if DEBUG: print(response.text)
         return response.text
 
     def delete_batch(self, batch_name):
@@ -215,6 +221,7 @@ class JobManagement:
         params = {"jobName": job_name}
         response = requests.post(self.base_url + endpoint, headers=self.headers, json=params)
         if response.status_code == 200:
+            if DEBUG: print(response.text)
             results_url = response.text.replace('"', '')
             results_response = requests.get(results_url, proxies=proxies)
             if results_response.status_code == 200:
@@ -233,6 +240,7 @@ class JobManagement:
             else:
                 return f"Failed to download results: {results_response.status_code}"
         else:
+            if DEBUG: print(response.text)
             return f"Failed to retrieve results URL: {response.status_code}"
 
     def get_batch_results(self, batch_name, output_folder="."):
@@ -252,6 +260,7 @@ class JobManagement:
         if folder is not None:
             params["folder"] = folder
         response = requests.get(self.base_url + endpoint, headers=self.headers, params=params)
+        if DEBUG: print(response.text)
         return response.json()
 
     def get_all_files(self):
@@ -259,6 +268,7 @@ class JobManagement:
         endpoint = "files"
         params = {"includeFolders": "true"}
         response = requests.get(self.base_url + endpoint, headers=self.headers, params=params)
+        if DEBUG: print(response.text)
         return response.json()
 
     def delete_file(self, file_path):
@@ -266,6 +276,7 @@ class JobManagement:
         endpoint = "delete-file"
         params = { "filePath": file_path }
         response = requests.get(self.base_url + endpoint, headers=self.headers, params=params)
+        if DEBUG: print(response.text)
         return response.json()
 
     def delete_batch_files(self, batch_name):
@@ -273,6 +284,7 @@ class JobManagement:
         endpoint = "delete-file"
         params = { "folder": batch_name}
         response = requests.get(self.base_url + endpoint, headers=self.headers, params=params)
+        if DEBUG: print(response.text)
         return response.json()
 
     def delete_all_files(self):
@@ -433,6 +445,26 @@ class Model:
 
     def download(self, job_name, output_folder="."):
         self.jm.get_results(job_name, output_folder)
+
+def parse_json(json_string):
+    try:
+        if json_string is None:
+            return None
+        return json.loads(json_string)
+    except json.JSONDecodeError as e:
+        print(f"Invalid JSON format: {e.msg}")
+        print(f"Error at line {e.lineno}, column {e.colno}")
+        print(f"Problematic part: {e.doc[e.pos-20:e.pos+20]}")
+        sys.exit(1)
+
+def main():
+    args = parse_arguments()
+    settings_dict = parse_json(args.setting)
+    print("Parsed JSON as dictionary:")
+    print(settings_dict)
+
+if __name__ == "__main__":
+    main()
 
 if __name__=="__main__":
     # Example usage:

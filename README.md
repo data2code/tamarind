@@ -98,6 +98,17 @@ This command will enter the monitoring mode, wait till the job is completed.
 
 We may use -W to avoid waiting. The submission will exit without monitoring.
 tmrmonitor, tmrdownload, tmrdeljob will be used to manually manuscript the submission
+
+### Run Boltz
+
+Model should support two additional arguments, we will use Boltz as the example.
+
+	tmrrun boltz --debug
+		The --debug option will enable the API calls to print out the response text
+
+	tmrrun boltz --setting='{"version":"1.0.0"}' -n myrun -o output_folder input.csv
+		Model has default settings, one can overwrite it by providing --setting with a JSON string.
+		Here the default boltz model is version 2, but we can overwrite it to use boltz-1.
 	
 ## Developer
 

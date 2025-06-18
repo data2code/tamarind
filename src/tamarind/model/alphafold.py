@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import tamarind.tarmarind as tmr
 from tamarind.tamarind import JobManagement, Model
 import os,pandas as pd
 import argparse as arg
@@ -135,9 +136,14 @@ def main():
     opt = arg.ArgumentParser(description='Run AlphaFold')
     opt.add_argument('-n','--name', type=str, default=None, help='batch name, should be unique.')
     opt.add_argument('-o','--output', type=str, default=".", help='Folder to store results.')
+    opt.add_argument('--setting', type=str, default=None, help='JSON string that overwrites the default model settings')
+    opt.add_argument('--debug', action='store_true', help='Print message from the API')
     opt.add_argument('-W','--nowait', action="store_true", help='Exit right after submission without monitoring, you will need to download results later using tmrdownload.')
     opt.add_argument('input', type=str, default=None, help='Input .csv file, require columns: "name", "sequence", "template". Column "template" is optional.')
     args=opt.parse_args()
+    if args.debug:
+        tmr.DEBUG = True
+    opt=tmr.parse_json(args.setting)
     m = App()
     jobs = m.jm.get_jobs(job_name=args.name)
     if len(jobs)>0:
@@ -148,7 +154,7 @@ def main():
         if col not in t.columns:
             print(f"ERROR> missing required column {col}.")
     S_template = t.template.tolist() if 'template' in t.columns else None
-    m.batch(args.name, t.name.tolist(), t.sequence.tolist(), output_folder=args.output, S_custom_template=S_template, wait=not args.nowait)
+    m.batch(args.name, t.name.tolist(), t.sequence.tolist(), output_folder=args.output, S_custom_template=S_template, options=opt, wait=not args.nowait)
 
 if __name__=="__main__":
     main()

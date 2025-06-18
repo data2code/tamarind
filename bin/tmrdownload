@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import tamarind.tamarind as tmr
 from tamarind.tamarind import JobManagement, Model
 import argparse as arg
 import os,importlib,traceback
@@ -7,6 +8,7 @@ if __name__=="__main__":
     opt=arg.ArgumentParser(description='Download Results for jobs/batches')
     opt.add_argument('-o','--output_folder', type=str, default=".", help='Parent folder to host result data')
     opt.add_argument('--all', action='store_true', help='Download results for ALL jobs and batches')
+    opt.add_argument('--debug', action='store_true', help='Print message from API')
     opt.add_argument('name', type=str, default=None, nargs="*", help='List of job/batch names')
     args=opt.parse_args()
     jm = JobManagement()
