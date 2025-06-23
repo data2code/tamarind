@@ -47,10 +47,24 @@ class App(Model): # Do not rename the class
         if options is not None:
             opt.update(options)
 
+        def load_json(opt, pdb_id):
+            import util_bzhou
+            from string import Template
+            template = Template(opt['__json__'])
+            fn_json = template.substitute(pdb_id=pdb_id)
+            s = util_bzhou.DumpObject.load_json(fn_json)
+            del opt['__json__']
+            opt.update(s)
+            # print(opt)
+            return opt
+
+        
         settings=[]
         jobNames=[]
         for i in range(n):
             one=opt.copy()
+            if '__json__' in one:
+                one = load_json(one,S_name[i])
             jobNames.append(S_name[i])
             #// Custom logic mostly to be inserted here
             one["sequence"]=S_seq[i]
