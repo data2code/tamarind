@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import tamarind.tamarind as tmr
 from tamarind.tamarind import JobManagement, Model
-import os,pandas as pd
+import os,pandas as pd,re
 import argparse as arg
 
 class App(Model): # Do not rename the class
@@ -18,34 +18,29 @@ class App(Model): # Do not rename the class
             "templateFiles": [], "templateMapping": []
             }
 
-    def run(self, name, seq, output_folder=".", options=None, wait=True):
+    def run(self, name, seq, custom_template=None, output_folder=".", options=None, wait=True):
         """Set name to your protein name. name should be unique to your account.
         The submission will fail if the name already exists.
         If you want to recompute a previous name, use delete/delete_all first
         """
-        opt=App.default_opt.copy()
-        if options is not None:
-            opt.update(options)
+        opt = self.get_options(options)
+
+        S_tmpl = self.upload_templates(name, custom_template)[0]
+        if len(S_tmpl):
+            opt["templateFiles"] = S_tmpl[0]
 
         opt["sequence"]=seq
         super().run(name, opt, output_folder, wait)
 
-    def batch(self, batch_name, S_name, S_seq, output_folder=".", options=None, wait=True):
+    def batch(self, batch_name, S_name, S_seq, S_custom_template=None, output_folder=".", options=None, wait=True):
+        opt = self.get_options(options)
         n=len(S_seq)
         assert(len(S_name)==n)
-        n_dup=len(S_name)-len(set(S_name))
-        if n_dup>0:
-            print(f"ERROR> There are {n_dup} duplicate names in S_name")
-            c_seen=set()
-            for x in S_name:
-                if x in c_seen:
-                    print(x)
-                c_seen.add(x)
-            exit()
+        self.no_duplicate("S_name", S_name)
 
-        opt=App.default_opt.copy()
-        if options is not None:
-            opt.update(options)
+        S_tmpl = self.upload_templates(S_name, S_custom_template, batch_name)
+        # merge all templates, as they are shared within a batch
+        S_tmpl = sorted(list({x for X in S_tmpl for x in X if x!=''}))
 
         def load_json(opt, pdb_id):
             import util_bzhou
@@ -58,7 +53,6 @@ class App(Model): # Do not rename the class
             # print(opt)
             return opt
 
-        
         settings=[]
         jobNames=[]
         for i in range(n):
@@ -68,6 +62,8 @@ class App(Model): # Do not rename the class
             jobNames.append(S_name[i])
             #// Custom logic mostly to be inserted here
             one["sequence"]=S_seq[i]
+            if len(S_tmpl):
+                one["templateFiles"]=S_tmpl
             settings.append(one)
         params = {
             "batchName": batch_name,
@@ -125,7 +121,13 @@ def main():
     for col in ['name','sequence']:
         if col not in t.columns:
             print(f"ERROR> missing required column {col}.")
-    m.batch(args.name, t.name.tolist(), t.sequence.tolist(), output_folder=args.output, options=opt,)
+    # boltz model share the same templates per batch
+    S_template = t.template.tolist() if 'template' in t.columns else None
+    if S_template is not None:
+        S=[x for x in S_template if pd.notnull(x)]
+        S_template=list(set(x.strip() for x in re.split(r';\s*', ";".join(S))))
+        print(f"Custom templates provided: {len(S_template)}.")
+    m.batch(args.name, t.name.tolist(), t.sequence.tolist(), S_custom_template=S_template, output_folder=args.output, options=opt,)
     print(f"Job completed, outputs in {args.output}.\nPlease delete the batch with: deljob.py {args.name}")
 
 if __name__=="__main__":

@@ -36,6 +36,7 @@ class JobManagement:
             "settings": settings
         }
         response = requests.post(self.base_url + endpoint, headers=self.headers, json=params)
+        if DEBUG: print(response.text)
         if response.status_code!=200:
             raise Exception(f"Job {job_name} cannot be created! "+response.text)
         return response.text
@@ -48,6 +49,7 @@ class JobManagement:
         settings["batchName"] = batch_name
         settings["type"] = job_type
         response = requests.post(self.base_url + endpoint, headers=self.headers, json=settings)
+        if DEBUG: print(response.text)
         return response.text
 
     def upload_file(self, local_filepath, uploaded_filename, folder=None):
@@ -78,16 +80,18 @@ class JobManagement:
         for x in set(S_local_filepath):
             if pd.isnull(x) or x=='': continue
             fn, ext = os.path.splitext(os.path.basename(x))
-            name = fn+("" if ext=="" else "."+ext)
+            name = fn+ext
             full_name=os.path.join(batch_name, name)
             i=2
             while full_name in uploaded:
-                name= fn+str(i)+("" if ext=="" else "."+ext)
+                name= fn+str(i)+ext
                 full_name=os.path.join(batch_name, name)
                 i+=1
             self.upload_file(x, name, folder=batch_name)
             c_upload[x]=full_name
             uploaded.add(full_name)
+        if DEBUG:
+            print("Uploading files: ", c_upload)
         return c_upload
 
     def is_batch(self, job_name):
@@ -400,6 +404,87 @@ class Model:
         self.job_name=None
         self.batch_name=None
 
+    def get_options(self, options = None):
+        opt = self.__class__.default_opt.copy()
+        if options is not None:
+            opt.update(options)
+        return opt
+
+    def no_duplicate(self, s_name, S_name):
+        n_dup=len(S_name)-len(set(S_name))
+        if n_dup>0:
+            print(f"ERROR> There are {n_dup} duplicate entries in {s_name}")
+            c_seen=set()
+            for x in S_name:
+                if x in c_seen:
+                    print(x)
+                c_seen.add(x)
+            exit()
+
+    def upload_templates(self, S_name, S_tmpl, batch_name=None):
+        """ S_name, list of sequence names
+            S_tmpl, corresponding list of template file path. For one sequence name, there can be multiple
+                template files, which should be ";"-concatenated into one string
+            E.g., S_name=["a","b"], S_tmpl=["a_tmpl1.cif;a_tmpl2.cif", "b_tmpl.cif"]
+            if S_tmpl is a string, we assume it's shared by all entries
+
+            If batch_name is None, there should only be one entry in S_name, all attachments
+            are uploaded to the root folder.
+
+            return c_template, where keys are entries in S_name, values are list of uploaded file names
+        """
+        # Make sure size of S_name and S_tmpl are the same
+        if S_tmpl is None: return {}
+        if type(S_name) is str:
+            S_name=[S_name]
+            if type(S_tmpl) is not str:
+                # make sure they are treated as one entry
+                S_tmpl=";".join([x for x in S_tmpl if pd.notnull(x)])
+        n=len(S_name)
+        if batch_name is None and n!=1:
+            raise Exception(f"S_name must be one entry, if no batch_name is provided.")
+        if type(S_tmpl) is str:
+            S_tmpl=[S_tmpl]
+        if n>1 and len(S_tmpl)==1:
+            S_tmpl=S_tmpl*len(S_name)
+        if n!=len(S_tmpl):
+            raise Exception(f"Length of S_name mismatch S_tmpl: {n} vs {len(S_tmpl)}")
+        S_tmpl=['' if pd.isnull(x) else x for x in S_tmpl ]
+
+        for i,s in enumerate(S_tmpl):
+            S_fn =list({ x.strip() for x in re.split(r';\s*', s) })
+            S_tmpl[i]=S_fn
+        S_unique=list({ x for X in S_tmpl for x in X if x!=''})
+        c_template={}
+        # check file format
+        for x in S_unique:
+            if not os.path.exists(x):
+                raise Exception(f"file {x} not found!")
+            fmt=guess_format(x)
+            if fmt!="cif":
+                raise Exception(f"file {x} is not a .cif file!")
+        # upload
+        if batch_name is not None:
+            c_map=self.jm.upload_batch(batch_name, S_unique)
+        else:
+            c_map={}
+            uploaded=set()
+            for x in set(S_unique):
+                fn, ext = os.path.splitext(os.path.basename(x))
+                name = fn+ext
+                i=2
+                while name in uploaded:
+                    name= fn+str(i)+ext
+                    i+=1
+                self.jm.upload_file(x, name)
+                c_map[x]=name
+                uploaded.add(name)
+
+        c_template=[]
+        for i,X in enumerate(S_tmpl):
+            c_template.append(sorted([c_map[x] for x in X if x in c_map]))
+        return c_template
+
     def run(self, job_name=None, settings=None, output_folder=".", wait=True):
         """Run a single job"""
         self.job_name=job_name or self.jm.generate_temp_job_name()
@@ -456,6 +541,26 @@ def parse_json(json_string):
         print(f"Error at line {e.lineno}, column {e.colno}")
         print(f"Problematic part: {e.doc[e.pos-20:e.pos+20]}")
         sys.exit(1)
+
+def guess_format(fn):
+    """Guess if a file is PDB or CIF"""
+    ext=os.path.splitext(fn)[1]
+    if ext in ('.gz'):
+        #ColabFold cannot use .gz
+        #ext=os.path.splitext(fn[:-3])[1]
+        return "gz"
+    if ext in ('.pdb','.pdb1'): return "pdb"
+    if ext in ('.cif'): return "cif"
+    with open(fn, mode='rb') as f:
+        s=f.read()
+    s=s.decode("utf-8", 'ignore')
+    S=s.splitlines()
+    pat_loop=re.compile(r'^(loop_|data_|_atom)')
+    pat_key=re.compile(r'^(HEADER|TITLE|KEYWDS|REMARK|MODEL|END) ')
+    for s in S:
+        if pat_key.search(s): return 'pdb'
+        if pat_loop.search(s): return "cif"
+    return ""
 
 def main():
     args = parse_arguments()
